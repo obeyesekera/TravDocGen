@@ -20,25 +20,41 @@ namespace TravDocGen
         // Method to calculate the checksum for a given string
         private static int CalculateChecksum(string data)
         {
-            string weights = "731";
-            int sum = 0;
+            // Define the weights for each position
+            int[] weights = { 7, 3, 1 };
+
+            // Define the character values
+            Dictionary<char, int> charValues = new Dictionary<char, int>();
+            for (int i = 0; i < 10; i++)
+            {
+                charValues.Add((char)('0' + i), i);
+            }
+            for (int i = 0; i < 26; i++)
+            {
+                charValues.Add((char)('A' + i), 10 + i);
+            }
+
+            int total = 0;
             for (int i = 0; i < data.Length; i++)
             {
                 char c = data[i];
-                int value;
-                if (char.IsDigit(c))
-                    value = c - '0';
-                else if (char.IsLetter(c))
-                    value = c - 'A' + 10;
-                else
-                    value = 0;
-
-                sum += value * (weights[i % 3] - '0');
+                int value = charValues.ContainsKey(c) ? charValues[c] : 0; // Use 0 for unrecognized characters
+                total += value * weights[i % 3];
             }
-            return sum % 10;
+
+            return total % 10;
         }
 
-        public static string GenerateMRZ(string passportType, string passportNumber, string surname, string givenNames, string nationality, DateTime birthDate, string sex, DateTime expiryDate, string idNumber)
+        private string getGender(string sex) {
+            if (sex == "X") {
+                return "<";
+            }
+            else {
+                return sex;
+            }
+        }
+              
+        public string GenerateMRZ(string passportType, string passportNumber, string surname, string givenNames, string nationality, DateTime birthDate, string sex, DateTime expiryDate, string idNumber)
         {
             // Line 1: PP<Nationality<<Surname<<GivenNames
             StringBuilder line1 = new StringBuilder();
@@ -58,7 +74,7 @@ namespace TravDocGen
             line2.Append(nationality.ToUpper());                            //11 to 13 Nationality
             line2.Append(birthDate.ToString("yyMMdd"));                     //14 to 19 DOB
             line2.Append(CalculateChecksum(birthDate.ToString("yyMMdd")));  //20 Check digit for 14 to 19
-            line2.Append(sex.ToUpper());                                    //21 Gender
+            line2.Append(getGender(sex.ToUpper()));                                    //21 Gender
             line2.Append(expiryDate.ToString("yyMMdd"));                    //22 to 27 Expity Date
             line2.Append(CalculateChecksum(expiryDate.ToString("yyMMdd"))); //28 Check digit for 22 to 27
             line2.Append(idNumber.ToUpper().PadRight(14, '<'));             //29 to 42 ID Number
@@ -72,11 +88,14 @@ namespace TravDocGen
             }
 
             // Calculate the composite checksum
-            string composite = line2.ToString().Substring(0, 10).Replace("<","")        //1 to 10 Passport Number + Check Digit
-                              + line2.ToString().Substring(13, 7).Replace("<", "")      //14 to 20 DOB + Check Digit
-                              + line2.ToString().Substring(21, 22).Replace("<", "");    //22 to 43 Expiry Date + ID Number + Check Digit
+            // Composite = Passport Number + Check Digit + DOB + Check Digit + Expiry Date + ID Number + Check Digit
+
+            string composite = line2.ToString().Substring(0, 10)            //1 to 10 Passport Number + Check Digit
+                              + line2.ToString().Substring(13, 7)           //14 to 20 DOB + Check Digit
+                              + line2.ToString().Substring(21, 22);         //22 to 43 Expiry Date + ID Number + Check Digit
 
             // Ensure line 2 is exactly 44 characters
+
             line2.Append(CalculateChecksum(composite));
 
             // Combine the two lines for the MRZ
